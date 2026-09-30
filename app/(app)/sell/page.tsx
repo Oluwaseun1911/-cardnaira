@@ -64,25 +64,34 @@ export default function SellPage() {
     confirmWithPin({
       title: "Confirm trade",
       description: `Enter your transaction PIN to submit ${selectedRate.symbol}${numericAmount} ${selectedRate.card} for ${formatNaira(nairaValue)}.`,
-      action: () => {
-        const trade = submitTrade({
-          userId: user.id,
-          userName: user.fullName,
-          userPhone: user.phone,
-          userEmail: user.email,
-          cardName: selectedRate.card,
-          country: selectedRate.country,
-          currency: selectedRate.currency,
-          symbol: selectedRate.symbol,
-          amount: numericAmount,
-          rate: selectedRate.rate,
-          nairaValue,
-          cardImage: image,
-          bank,
-        })
-        setSubmitted(trade)
-        window.scrollTo({ top: 0 })
-      },
+            action: async () => {
+          const trade = submitTrade({
+            userId: user.id,
+            userName: user.fullName,
+            userPhone: user.phone,
+            userEmail: user.email,
+            cardName: selectedRate.card,
+            country: selectedRate.country,
+            currency: selectedRate.currency,
+            symbol: selectedRate.symbol,
+            amount: numericAmount,
+            rate: selectedRate.rate,
+            nairaValue,
+            cardImage: image,
+            bank,
+          })
+
+          try {
+            await fetch("/api/notify-admin", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ trade }),
+            })
+          } catch (e) {}
+
+          setSubmitted(trade)
+          window.scrollTo({ top: 0 })
+        },
     })
   }
 
