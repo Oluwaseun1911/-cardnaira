@@ -237,30 +237,39 @@ export function submitTrade(input: Omit<Trade, "id" | "status" | "createdAt" | "
   return trade
 }
 
-export function setTradeStatus(tradeId: string, status: TradeStatus, note?: string) {
+export function setTradeStatus(tradeId: string, status: Trade["status"]) {
   const trades = getTrades()
   const trade = trades.find((t) => t.id === tradeId)
   if (!trade) throw new Error("Trade not found.")
   const wasPaid = trade.status === "paid"
   writeKey(
     KEYS.trades,
-    trades.map((t) => (t.id === tradeId ? { ...t, status, note: note ?? t.note, updatedAt: now() } : t)),
+    trades.map((t) => (t.id === tradeId ? { ...t, status } : t))
   )
 
   if (status === "paid" && !wasPaid) {
     const customer = getUsers().find((u) => u.id === trade.userId)
-    if (customer?.referredBy && !customer.referralBonusPaid) {
-      const reward = Math.round(trade.nairaValue * REFERRAL_PERCENT)
+    if (!customer) return
+
+    // 1. CREDIT SELLER
+    updateUser(customer.id, (u) => ({
+      ...u,
+      balance: u.balance + trade.nairaValue,
+      transactions: [tx("trade", trade.nairaValue, `Trade ${trade.id} paid`), ...u.transactions],
+    }))
+
+    // 2. REFERRAL BONUS
+    if (customer?.referredBy && !customer.referralBonusGiven) {
+      const reward = Math.round(trade.nairaValue * 0.01)
       updateUser(customer.referredBy, (u) => ({
         ...u,
         balance: u.balance + reward,
-        transactions: [tx("referral", reward, `1% referral bonus from ${customer.fullName}'s first trade`), ...u.transactions],
+        transactions: [tx("referral", reward, `Referral from ${customer.fullName}`), ...u.transactions],
       }))
-      updateUser(customer.id, (u) => ({ ...u, referralBonusPaid: true }))
+      updateUser(customer.id, (u) => ({ ...u, referralBonusGiven: true } as any))
     }
   }
 }
-
 export function deleteTrade(tradeId: string) {
   writeKey(
     KEYS.trades,
